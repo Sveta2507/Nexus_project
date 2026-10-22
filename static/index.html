@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b1020">
+  <title>Nexus — захищена командна комунікація</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/styles.css?v=18">
+</head>
+<body>
+  <div id="auth-screen" class="auth-screen">
+    <section class="auth-card">
+      <div class="brand brand-large"><span class="brand-mark">N</span><span>Nexus</span></div>
+      <p class="eyebrow">Розподілена система комунікації</p>
+      <h1 id="auth-title">З поверненням</h1>
+      <p id="auth-subtitle" class="muted">Увійдіть до свого робочого простору</p>
+      <form id="auth-form" autocomplete="on">
+        <label id="display-name-field" class="field hidden">
+          <span>Ваше ім’я</span>
+          <input id="display-name" name="display_name" maxlength="50" placeholder="Наприклад, Олександр">
+        </label>
+        <label class="field">
+          <span>Логін</span>
+          <input id="username" name="username" minlength="3" maxlength="24" required autocomplete="username" placeholder="username">
+        </label>
+        <label class="field">
+          <span>Пароль</span>
+          <input id="password" name="password" type="password" minlength="8" required autocomplete="current-password" placeholder="Щонайменше 8 символів">
+        </label>
+        <p id="auth-error" class="form-error" role="alert"></p>
+        <button class="button primary wide" type="submit" id="auth-submit">Увійти</button>
+      </form>
+      <button id="auth-switch" class="text-button" type="button">Ще немає облікового запису? Створити</button>
+      <div class="trust-note"><span>●</span> Паролі зберігаються лише як стійкі хеші</div>
+    </section>
+    <aside class="auth-art" aria-hidden="true">
+      <div class="art-orb orb-one"></div><div class="art-orb orb-two"></div>
+      <div class="network-card n1"><span></span> Node A</div>
+      <div class="network-line"></div>
+      <div class="network-card n2"><span></span> Node B</div>
+      <div class="art-copy"><strong>Спілкуйтесь без меж.</strong><br>Чат, документи та живе аудіо між незалежними вузлами.</div>
+    </aside>
+  </div>
+
+  <div id="app" class="app hidden">
+    <nav class="rail" aria-label="Головна навігація">
+      <div class="brand-mark">N</div>
+      <button class="rail-button active" title="Канали" aria-label="Канали">#</button>
+      <button id="open-documents-rail" class="rail-button" title="Документи" aria-label="Документи">▤</button>
+      <span class="rail-spacer"></span>
+      <button id="open-shortcuts" class="rail-button" title="Гарячі клавіші" aria-label="Відкрити список гарячих клавіш"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm0 2v10h16V7H4Zm2 2h2v2H6V9Zm3 0h2v2H9V9Zm3 0h2v2h-2V9Zm3 0h3v2h-3V9Zm-9 4h3v2H6v-2Zm4 0h8v2h-8v-2Z"/></svg></button>
+      <button id="open-system" class="rail-button" title="Стан системи" aria-label="Стан системи">⌁</button>
+    </nav>
+
+    <aside id="sidebar" class="sidebar">
+      <header class="workspace-head">
+        <div><span class="eyebrow">Робочий простір</span><strong>Nexus Team</strong></div>
+        <span id="connection-dot" class="status-dot connecting" title="З’єднання" role="status" aria-live="polite" aria-label="Підключення"></span>
+      </header>
+      <div class="sidebar-section">
+        <div class="section-row channel-section-head">
+          <span class="section-label">Канали</span>
+          <button id="create-channel-button" class="mini-button" title="Створити канал" aria-label="Створити канал">＋</button>
+        </div>
+        <div id="channel-list" class="channel-list"></div>
+      </div>
+      <div class="sidebar-section grow">
+        <div class="section-row"><span class="section-label">Учасники</span><span id="online-count" class="count">0</span></div>
+        <div id="sidebar-users" class="sidebar-users"></div>
+      </div>
+      <div class="profile-card">
+        <div id="profile-avatar" class="avatar"></div>
+        <div class="profile-copy"><strong id="profile-name"></strong><span id="profile-node"></span></div>
+        <button id="logout" class="icon-button" title="Вийти" aria-label="Вийти">↪</button>
+      </div>
+    </aside>
+
+    <main class="main-panel">
+      <header class="topbar">
+        <button id="mobile-menu" class="icon-button mobile-only" aria-label="Меню">☰</button>
+        <div class="channel-title"><span id="channel-icon">#</span><div><strong id="channel-name">загальний</strong><small id="channel-description">Командне обговорення в реальному часі</small></div></div>
+        <div class="top-actions">
+          <button id="open-documents" class="button subtle"><span>▤</span> Документи</button>
+          <button id="toggle-people" class="icon-button people-toggle" title="Аудиторія трансляції" aria-label="Показати аудиторію трансляції" aria-controls="people-panel" aria-expanded="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 11a4 4 0 1 0-3.4-6.1A5.5 5.5 0 0 1 14 8.5c0 .9-.2 1.7-.6 2.5H16Zm-7.5 1A4.5 4.5 0 1 0 4 7.5 4.5 4.5 0 0 0 8.5 12Zm0 2C4.9 14 2 16 2 18.5V21h13v-2.5C15 16 12.1 14 8.5 14Zm7.2-.9c-.8 0-1.6.1-2.3.4 2.2 1.1 3.6 2.9 3.6 5V21h5v-2.4c0-3-2.8-5.5-6.3-5.5Z"/></svg></button>
+        </div>
+      </header>
+
+      <div class="content-row">
+        <section class="chat-pane">
+          <div id="message-list" class="message-list" aria-live="polite">
+            <div class="welcome-message">
+              <div class="welcome-icon">#</div>
+              <h2>Ласкаво просимо до Nexus</h2>
+              <p>Це початок каналу. Повідомлення синхронізуються між серверними вузлами.</p>
+            </div>
+          </div>
+          <div class="composer-status"><div id="typing-status" class="typing-status"></div><span id="client-outbox-status" class="client-outbox-status hidden"></span></div>
+          <form id="message-form" class="composer">
+            <textarea id="message-input" rows="1" maxlength="4000" placeholder="Написати у #загальний" aria-label="Повідомлення"></textarea>
+            <button id="audio-toggle" class="composer-action composer-audio" type="button" title="Почати голосову трансляцію" aria-label="Почати голосову трансляцію"><svg class="mic-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="3" width="8" height="12" rx="4"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"></path></svg><span class="audio-label visually-hidden">Говорити</span></button>
+            <button class="send-button" type="submit" title="Надіслати" aria-label="Надіслати">➤</button>
+          </form>
+        </section>
+
+        <aside id="people-panel" class="people-panel">
+          <div class="panel-heading"><div><span class="eyebrow">Аудиторія</span><h3>Кому транслювати</h3></div><button id="close-people" class="icon-button" title="Закрити" aria-label="Закрити панель аудиторії">×</button></div>
+          <p class="panel-help">Оберіть одержувачів аудіо та демонстрації документа.</p>
+          <label class="select-all"><input id="select-all-users" type="checkbox"> <span>Обрати всіх</span></label>
+          <div id="recipient-list" class="recipient-list"></div>
+          <div class="selection-summary"><span id="selected-count">0</span> вибрано</div>
+        </aside>
+      </div>
+    </main>
+  </div>
+
+  <section id="documents-drawer" class="drawer" aria-hidden="true">
+    <div class="drawer-backdrop" data-close="documents"></div>
+    <div class="drawer-panel">
+      <header class="drawer-head"><div><span class="eyebrow">Бібліотека каналу · <b id="documents-channel-name">#загальний</b></span><h2>Документи каналу</h2></div><button class="icon-button" data-close="documents" title="Закрити" aria-label="Закрити бібліотеку">×</button></header>
+      <form id="upload-form" class="upload-box">
+        <label class="drop-zone" for="document-file"><span class="upload-icon">⇧</span><strong>Оберіть файл</strong><small>TXT, MD, PDF або зображення · до 8 МБ</small><input id="document-file" type="file" accept=".txt,.md,.pdf,image/*" required></label>
+        <p class="upload-hint">Тип матеріалу та кількість сторінок PDF визначаються автоматично.</p>
+        <button class="button primary wide" type="submit">Завантажити</button>
+        <div id="upload-progress" class="upload-progress"><span></span></div>
+      </form>
+      <div class="section-row"><h3>Доступні матеріали</h3><span id="document-count" class="count">0</span></div>
+      <div id="document-list" class="document-list"></div>
+    </div>
+  </section>
+
+  <section id="stage" class="stage hidden" aria-label="Демонстрація документа">
+    <header class="stage-head">
+      <div class="stage-title"><span id="stage-kind" class="document-badge">DOC</span><div><strong id="stage-name"></strong><small id="stage-owner"></small></div></div>
+      <div class="stage-controls">
+        <span id="presentation-status" class="presentation-status hidden"></span>
+        <div id="page-controls" class="page-controls hidden">
+          <button id="page-prev" class="icon-button" title="Попередня сторінка" aria-label="Попередня сторінка">‹</button>
+          <span><input id="current-page" type="number" min="1" value="1"> / <b id="total-pages">1</b></span>
+          <button id="page-next" class="icon-button" title="Наступна сторінка" aria-label="Наступна сторінка">›</button>
+        </div>
+        <div id="zoom-controls" class="zoom-controls" aria-label="Масштаб документа">
+          <button id="zoom-out" class="icon-button" type="button" title="Зменшити масштаб" aria-label="Зменшити масштаб">−</button>
+          <button id="zoom-reset" class="zoom-value" type="button" title="Повернути масштаб 100%" aria-label="Повернути масштаб 100%">100%</button>
+          <button id="zoom-in" class="icon-button" type="button" title="Збільшити масштаб" aria-label="Збільшити масштаб">+</button>
+        </div>
+        <button id="share-document" class="button primary">Транслювати</button>
+        <button id="close-stage" class="icon-button" title="Закрити" aria-label="Закрити демонстрацію">×</button>
+      </div>
+    </header>
+    <div id="stage-notice" class="stage-notice hidden"></div>
+    <div id="viewer-shell" class="viewer-shell">
+      <div id="document-viewer" class="document-viewer"></div>
+      <div id="presentation-surface" class="presentation-surface" aria-hidden="true"></div>
+      <div id="remote-cursor" class="remote-cursor hidden"><span></span></div>
+    </div>
+  </section>
+
+  <section id="system-modal" class="modal hidden">
+    <div class="modal-card system-card">
+      <header class="drawer-head"><div><span class="eyebrow">Діагностика</span><h2>Стан вузла</h2></div><button id="close-system" class="icon-button" title="Закрити" aria-label="Закрити діагностику">×</button></header>
+      <div id="system-grid" class="system-grid"></div>
+      <p class="panel-help">Детальний інтерактивний опис API доступний за адресою <a href="/docs" target="_blank">/docs</a>.</p>
+    </div>
+  </section>
+
+  <section id="shortcuts-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="shortcuts-title">
+    <div class="modal-card shortcuts-card">
+      <header class="drawer-head"><div><span class="eyebrow">Навігація без миші</span><h2 id="shortcuts-title">Гарячі клавіші</h2></div><button id="close-shortcuts" class="icon-button" type="button" title="Закрити" aria-label="Закрити гарячі клавіші">×</button></header>
+      <div class="shortcut-list">
+        <div><span>Надіслати повідомлення</span><kbd>Enter</kbd></div>
+        <div><span>Новий рядок у повідомленні</span><span><kbd>Shift</kbd><b>+</b><kbd>Enter</kbd></span></div>
+        <div><span>Відкрити цю довідку</span><span><kbd>Ctrl</kbd><b>+</b><kbd>/</kbd></span></div>
+        <div><span>Створити канал</span><span><kbd>Alt</kbd><b>+</b><kbd>N</kbd></span></div>
+        <div><span>Документи каналу</span><span><kbd>Alt</kbd><b>+</b><kbd>O</kbd></span></div>
+        <div><span>Аудиторія трансляції</span><span><kbd>Alt</kbd><b>+</b><kbd>U</kbd></span></div>
+        <div><span>Діагностика вузла</span><span><kbd>Alt</kbd><b>+</b><kbd>I</kbd></span></div>
+        <div><span>Попередня/наступна сторінка презентації</span><span><kbd>←</kbd><b>/</b><kbd>→</kbd></span></div>
+        <div><span>Масштаб документа</span><span><kbd>Ctrl</kbd><b>+</b><kbd>+</kbd><b>/</b><kbd>−</kbd><b>/</b><kbd>0</kbd></span></div>
+        <div><span>Закрити активне вікно</span><kbd>Esc</kbd></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="diagnostic-help-modal" class="modal diagnostic-help-modal hidden" role="dialog" aria-modal="true" aria-labelledby="diagnostic-help-title">
+    <div class="modal-card diagnostic-help-card">
+      <header class="drawer-head"><div><span class="eyebrow">Пояснення показника</span><h2 id="diagnostic-help-title"></h2></div><button id="close-diagnostic-help" class="icon-button" type="button" title="Закрити" aria-label="Закрити пояснення">×</button></header>
+      <p id="diagnostic-help-summary" class="diagnostic-help-summary"></p>
+      <div class="diagnostic-current"><span>Поточне значення</span><strong id="diagnostic-help-value"></strong></div>
+      <section class="diagnostic-purpose"><h3>Для чого це потрібно</h3><p id="diagnostic-help-purpose"></p></section>
+      <p id="diagnostic-help-hint" class="panel-help"></p>
+    </div>
+  </section>
+
+  <section id="channel-modal" class="modal hidden">
+    <form id="channel-form" class="modal-card channel-form">
+      <header class="drawer-head"><div><span class="eyebrow">Новий простір</span><h2>Створити канал</h2></div><button id="close-channel-modal" class="icon-button" type="button" title="Закрити" aria-label="Закрити форму">×</button></header>
+      <p class="channel-form-intro">Створіть окремий захищений простір для команди, повідомлень і документів.</p>
+      <div class="channel-fields">
+        <label class="field"><span>Назва каналу</span><input id="new-channel-name" maxlength="40" required placeholder="Наприклад, дипломний-проєкт"></label>
+        <label class="field"><span>Короткий опис</span><input id="new-channel-description" maxlength="160" placeholder="Про що цей канал"></label>
+      </div>
+      <label class="encryption-option">
+        <span class="lock-symbol" aria-hidden="true">◆</span>
+        <span class="encryption-copy"><strong>Наскрізне шифрування</strong><small>AES-256-GCM · сервер зберігає лише шифротекст повідомлень</small></span>
+        <input id="new-channel-encrypted" class="visually-hidden" type="checkbox" checked>
+        <span class="toggle-switch" aria-hidden="true"></span>
+      </label>
+      <section class="channel-members-section"><div class="channel-members-heading"><div><strong>Учасники</strong><small>Ви автоматично станете власником каналу</small></div><span id="channel-member-count" class="count">0 вибрано</span></div><div id="channel-member-list" class="channel-member-list"></div></section>
+      <footer class="channel-form-footer"><p id="channel-error" class="form-error"></p><button id="channel-submit" class="button primary wide" type="submit">Створити захищений канал</button></footer>
+    </form>
+  </section>
+
+  <div id="toast-region" class="toast-region" aria-live="polite"></div>
+  <script src="/static/app.js?v=19" charset="utf-8" defer></script>
+</body>
+</html>

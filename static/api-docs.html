@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1020">
+  <title>Nexus API — локальна документація</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/api-docs.css?v=1">
+</head>
+<body>
+  <header class="hero">
+    <a class="brand" href="/" aria-label="Повернутися до Nexus"><span>N</span>Nexus</a>
+    <div class="hero-copy">
+      <p>Локальна документація API</p>
+      <h1 id="api-title">Nexus API</h1>
+      <div class="meta"><span id="api-version">завантаження…</span><span id="endpoint-count"></span><a href="/openapi.json">OpenAPI JSON</a></div>
+    </div>
+  </header>
+  <main>
+    <section class="intro">
+      <div>
+        <h2>Інтерфейси інформаційної системи</h2>
+        <p id="api-description">Завантажую схему безпосередньо з локального сервера.</p>
+      </div>
+      <label class="search"><span>Пошук маршруту</span><input id="endpoint-filter" type="search" placeholder="Наприклад, messages або documents" autocomplete="off"></label>
+    </section>
+    <aside class="auth-note"><strong>Авторизація</strong><span>Захищені REST-запити використовують заголовок <code>Authorization: Bearer &lt;token&gt;</code>. Токен повертається після реєстрації або входу.</span></aside>
+    <div id="docs-status" class="status" role="status" aria-live="polite">Завантаження маршрутів…</div>
+    <div id="endpoint-groups"></div>
+  </main>
+  <script src="/static/api-docs.js?v=1" defer></script>
+</body>
+</html>
