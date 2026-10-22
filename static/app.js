@@ -411,28 +411,38 @@ async function deviceFingerprint(publicKey) {
   return [...digest.slice(0, 8)].map(value => value.toString(16).padStart(2, "0")).join("").match(/.{1,4}/g).join(" ");
 }
 
-async function ensureDeviceIdentity() {
-  // кожен профіль браузера має власну пару ecdh-ключів і сталий ідентифікатор пристрою
-  if (!window.crypto?.subtle || !window.indexedDB) throw new Error("Браузер не підтримує Web Crypto/IndexedDB");
-  let deviceId = localStorage.getItem("nexus_device_id");
-  if (!deviceId) {
-    deviceId = crypto.randomUUID();
-    localStorage.setItem("nexus_device_id", deviceId);
-  }
+async function loadOrCreateDeviceIdentity(deviceId) {
   let identity = await cryptoStoreGet("identity", deviceId);
-  if (!identity) {
-    const generated = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
-    const publicKey = await crypto.subtle.exportKey("jwk", generated.publicKey);
-    const privateJwk = await crypto.subtle.exportKey("jwk", generated.privateKey);
-    const privateKey = await crypto.subtle.importKey(
-      "jwk", privateJwk, { name: "ECDH", namedCurve: "P-256" }, false, ["deriveBits"]
-    );
-    identity = { deviceId, publicKey, privateKey };
-    await cryptoStorePut("identity", deviceId, identity);
+  if (identity) return identity;
+  const generated = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
+  const publicKey = await crypto.subtle.exportKey("jwk", generated.publicKey);
+  const privateJwk = await crypto.subtle.exportKey("jwk", generated.privateKey);
+  const privateKey = await crypto.subtle.importKey(
+    "jwk", privateJwk, { name: "ECDH", namedCurve: "P-256" }, false, ["deriveBits"]
+  );
+  identity = { deviceId, publicKey, privateKey };
+  await cryptoStorePut("identity", deviceId, identity);
+  return identity;
+}
+
+async function ensureDeviceIdentity() {
+  // кожен обліковий запис у профілі браузера має окрему пару ecdh-ключів та ідентифікатор пристрою
+  if (!window.crypto?.subtle || !window.indexedDB) throw new Error("Браузер не підтримує Web Crypto/IndexedDB");
+  const username = state.me.username.toLowerCase();
+  const storageKey = `nexus_device_id:${username}`;
+  const known = await api(`/api/keys/devices?usernames=${encodeURIComponent(username)}`);
+  let deviceId = localStorage.getItem(storageKey);
+  if (!deviceId) {
+    // старий спільний ключ переноситься лише тоді, коли сервер уже пов’язує його з поточним користувачем
+    const legacyDeviceId = localStorage.getItem("nexus_device_id");
+    deviceId = legacyDeviceId && known.devices.some(item => item.device_id === legacyDeviceId)
+      ? legacyDeviceId
+      : crypto.randomUUID();
+    localStorage.setItem(storageKey, deviceId);
   }
+  const identity = await loadOrCreateDeviceIdentity(deviceId);
   identity.fingerprint = await deviceFingerprint(identity.publicKey);
   state.device = identity;
-  const known = await api(`/api/keys/devices?usernames=${encodeURIComponent(state.me.username)}`);
   const existing = known.devices.find(item => item.device_id === deviceId);
   if (
     !existing
@@ -944,9 +954,10 @@ async function createChannel(event) {
   const memberUsernames = [state.me.username, ...selected];
   let rawKey = null;
   try {
-    if (encrypted && !state.device) throw new Error("E2EE-ідентичність пристрою недоступна");
     let keyEnvelopes = [];
     if (encrypted) {
+      // повторна перевірка самостійно відновлює ключ після тимчасової помилки під час входу
+      await ensureDeviceIdentity();
       const result = await api(`/api/keys/devices?usernames=${encodeURIComponent(memberUsernames.join(","))}`);
       const missing = memberUsernames.filter(name => !result.devices.some(device => device.username === name));
       if (missing.length) throw new Error(`Ці користувачі мають спочатку увійти в Nexus: ${missing.join(", ")}`);
@@ -1227,14 +1238,16 @@ async function loadUsers() {
   renderUsers();
 }
 
-function availableRecipients() {
+function activeChannelUsers() {
   const channel = state.activeChannel;
   const memberNames = channel?.is_private
     ? new Set((channel.members || []).map(member => member.username))
     : null;
-  return state.users.filter(user => (
-    user.id !== state.me.id && (!memberNames || memberNames.has(user.username))
-  ));
+  return state.users.filter(user => !memberNames || memberNames.has(user.username));
+}
+
+function availableRecipients() {
+  return activeChannelUsers().filter(user => user.id !== state.me.id);
 }
 
 function renderUsers() {
@@ -1242,10 +1255,14 @@ function renderUsers() {
   const recipients = $("#recipient-list");
   sidebar.replaceChildren();
   recipients.replaceChildren();
-  const onlineCount = state.users.filter(user => user.online).length;
-  $("#online-count").textContent = onlineCount;
+  const participants = activeChannelUsers();
+  const onlineCount = participants.filter(user => user.online).length;
+  const participantCount = $("#participant-count");
+  participantCount.textContent = participants.length;
+  participantCount.title = `Онлайн: ${onlineCount} із ${participants.length}`;
+  participantCount.setAttribute("aria-label", `${participants.length} учасників, онлайн ${onlineCount}`);
   const audienceNames = new Set(availableRecipients().map(user => user.username));
-  for (const user of state.users) {
+  for (const user of participants) {
     const row = document.createElement("div");
     row.className = "sidebar-user";
     row.innerHTML = `<div class="avatar ${user.online ? "online" : ""}">${initials(user.display_name)}</div>`;

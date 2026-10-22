@@ -101,6 +101,18 @@ def main() -> None:
         while time.time() < deadline and not tools.evaluate("document.querySelector('#channel-list .channel') !== null"):
             time.sleep(0.1)
         assert tools.evaluate("document.querySelector('#connection-dot').classList.contains('offline')") is False
+        participant_summary = tools.evaluate(
+            "(async()=>{const offlineUsername=`offline_${Date.now()}`;"
+            "await api('/api/auth/register',{method:'POST',body:JSON.stringify({username:offlineUsername,"
+            "password:'Browser-password-123',display_name:'Offline Member'})});await loadUsers();"
+            "return {total:state.users.length,online:state.users.filter(user=>user.online).length,"
+            "badge:Number(document.querySelector('#participant-count').textContent),"
+            "rows:document.querySelectorAll('#sidebar-users .sidebar-user').length}})()"
+        )
+        assert participant_summary["total"] >= 2, participant_summary
+        assert participant_summary["online"] < participant_summary["total"], participant_summary
+        assert participant_summary["badge"] == participant_summary["total"], participant_summary
+        assert participant_summary["rows"] == participant_summary["total"], participant_summary
         if tools.evaluate("document.querySelector('#toggle-people').getAttribute('aria-expanded')") != "true":
             tools.evaluate("document.querySelector('#toggle-people').click()")
         assert tools.evaluate("document.querySelector('#toggle-people').getAttribute('aria-expanded')") == "true"
@@ -148,6 +160,8 @@ def main() -> None:
         else:
             error = tools.evaluate("document.querySelector('#channel-error').textContent")
             raise AssertionError(f"Encrypted channel was not created: {error}")
+        assert tools.evaluate("Number(document.querySelector('#participant-count').textContent)") == 1
+        assert tools.evaluate("document.querySelectorAll('#sidebar-users .sidebar-user').length") == 1
 
         secret_message = "browser plaintext must stay client-side"
         tools.evaluate(f"document.querySelector('#message-input').value={json.dumps(secret_message)}")
@@ -274,8 +288,34 @@ def main() -> None:
             tools.evaluate("closeSystem()")
             screenshot = tools.call("Page.captureScreenshot", {"format": "png"})["data"]
             Path(sys.argv[2]).write_bytes(base64.b64decode(screenshot))
+        account_switch = tools.evaluate(
+            "(async()=>{const firstUsername=state.me.username;const firstDevice=state.device.deviceId;"
+            "const secondUsername=`lucy_${Date.now()}`;"
+            "const registered=await api('/api/auth/register',{method:'POST',body:JSON.stringify({"
+            "username:secondUsername,password:'Browser-password-123',display_name:'Lucy Test'})});"
+            "state.token=registered.token;state.me=registered.user;state.nodeId=registered.node_id;"
+            "localStorage.setItem('nexus_token',state.token);state.device=null;await ensureDeviceIdentity();"
+            "const devices=await api(`/api/keys/devices?usernames=${encodeURIComponent(secondUsername)}`);"
+            "const channelId=crypto.randomUUID();const rawKey=crypto.getRandomValues(new Uint8Array(32));"
+            "await storeChannelKey(channelId,rawKey);"
+            "const envelopes=await Promise.all(devices.devices.map(device=>wrapChannelKey(channelId,rawKey,device)));"
+            "const created=await api('/api/channels',{method:'POST',body:JSON.stringify({id:channelId,"
+            "name:'lucy-self-channel',description:'device isolation check',member_usernames:[],"
+            "encrypted:true,key_envelopes:envelopes})});"
+            "return {firstDevice,secondDevice:state.device.deviceId,deviceCount:devices.devices.length,"
+            "firstStored:localStorage.getItem(`nexus_device_id:${firstUsername}`),"
+            "secondStored:localStorage.getItem(`nexus_device_id:${secondUsername}`),"
+            "created:created.channel.id===channelId}})()"
+        )
+        assert account_switch["firstDevice"] != account_switch["secondDevice"], account_switch
+        assert account_switch["firstStored"] == account_switch["firstDevice"], account_switch
+        assert account_switch["secondStored"] == account_switch["secondDevice"], account_switch
+        assert account_switch["deviceCount"] >= 1 and account_switch["created"] is True, account_switch
         assert not tools.exceptions, f"Browser JavaScript exceptions: {tools.exceptions}"
-        print("OK: browser registration, E2EE, WebSocket, image/TXT/PDF zoom 50-200% and system modal")
+        print(
+            "OK: browser registration, per-account E2EE devices, encrypted channels, WebSocket, "
+            "image/TXT/PDF zoom 50-200% and system modal"
+        )
     finally:
         tools.close()
 
